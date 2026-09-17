@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABANA — Enterprise Risk Register Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F4F5F2; --panel:#FFFFFF; --ink:#152420; --ink-soft:#5B6A63; --line:#E3E6E1;
+    --brand-deep:#0B3D2E; --brand-mid:#175C44; --brand-pale:#E8F0EC; --gold:#B08A34;
+    --crit:#B3271E; --crit-bg:#FBE8E6; --high:#D97B29; --high-bg:#FCEEDD;
+    --med:#C79A2B; --med-bg:#FBF3DC; --low:#3E8E5B; --low-bg:#E7F3EA; --opp:#2E6E8E; --opp-bg:#E7F0F5;
+    --radius:10px; --shadow:0 1px 2px rgba(15,30,24,.05),0 1px 10px rgba(15,30,24,.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1512; --panel:#151E1A; --ink:#EAF0EC; --ink-soft:#9BAAA2; --line:#28352F;
+      --brand-pale:#152621; --crit-bg:#3A211E; --high-bg:#3A2C1A; --med-bg:#372F17; --low-bg:#1B2E22; --opp-bg:#182831;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1512; --panel:#151E1A; --ink:#EAF0EC; --ink-soft:#9BAAA2; --line:#28352F;
+    --brand-pale:#152621; --crit-bg:#3A211E; --high-bg:#3A2C1A; --med-bg:#372F17; --low-bg:#1B2E22; --opp-bg:#182831;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1360px;margin:0 auto;padding:0 28px 60px;}
+  header{background:linear-gradient(135deg,var(--brand-deep) 0%,#0F4A38 60%,var(--brand-mid) 100%);color:#F2F6F3;padding:26px 0 0;margin-bottom:26px;}
+  .header-inner{max-width:1360px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .mark{width:44px;height:44px;border-radius:10px;background:var(--gold);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#0B3D2E;flex:none;}
+  .brand-text .name{font-size:13px;letter-spacing:2px;font-weight:600;color:#CFE3D8;text-transform:uppercase;}
+  .brand-text h1{margin:2px 0 0;font-size:22px;font-weight:600;color:#fff;letter-spacing:-0.2px;}
+  .header-right{display:flex;align-items:center;gap:22px;flex-wrap:wrap;}
+  .header-meta{display:flex;gap:26px;flex-wrap:wrap;align-items:center;}
+  .header-meta .stat{text-align:right;}
+  .header-meta .stat .n{font-size:23px;font-weight:700;color:#fff;line-height:1;}
+  .header-meta .stat .l{font-size:11px;color:#BFDBCC;margin-top:5px;}
+  .update-btn{background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.3);color:#fff;font-size:12.5px;font-weight:600;padding:9px 16px;border-radius:8px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .update-btn:hover{background:rgba(255,255,255,0.22);}
+  .tabbar{max-width:1360px;margin:22px auto 0;padding:0 28px;display:flex;gap:6px;}
+  .tab{background:rgba(255,255,255,.10);color:#DCEAE2;border:1px solid rgba(255,255,255,.18);border-bottom:none;padding:11px 20px;border-radius:10px 10px 0 0;font-size:13.5px;font-weight:600;cursor:pointer;}
+  .tab.active{background:var(--bg);color:var(--brand-deep);}
+  .tab .sub{display:block;font-size:10.5px;font-weight:500;opacity:.75;margin-top:2px;}
+  .tab.active .sub{color:var(--ink-soft);}
+  .subbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:22px;}
+  .breadcrumb{font-size:13px;color:var(--ink-soft);}
+  .breadcrumb b{color:var(--ink);font-weight:600;}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{font-size:12.5px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--panel);color:var(--ink-soft);}
+  .chip.on{background:var(--brand-pale);border-color:var(--brand-mid);color:var(--brand-deep);font-weight:600;}
+  .chip.on.opp{background:var(--opp-bg);border-color:var(--opp);color:var(--opp);}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+  .kpi .bar{position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .kpi .label{font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:10px;}
+  .kpi .value{font-size:29px;font-weight:700;letter-spacing:-.5px;line-height:1;}
+  .kpi .sub{font-size:12px;color:var(--ink-soft);margin-top:8px;}
+  .kpi .sub b{color:var(--ink);}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px 20px;box-shadow:var(--shadow);}
+  .panel h2{font-size:14.5px;margin:0 0 3px;font-weight:600;}
+  .panel .desc{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px;}
+  .toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none;}
+  .toggle button{border:none;background:var(--panel);color:var(--ink-soft);font-size:11.5px;font-weight:600;padding:6px 11px;cursor:pointer;font-family:inherit;}
+  .toggle button.active{background:var(--brand-deep);color:#fff;}
+  .row-2{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .row-3{display:grid;grid-template-columns:1.2fr .9fr .9fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .row-2b{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .barlist{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+  .barrow{display:grid;grid-template-columns:150px 1fr 34px;gap:10px;align-items:center;}
+  .barrow .lbl{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .barrow .track{height:16px;background:var(--brand-pale);border-radius:5px;overflow:hidden;position:relative;}
+  .barrow .fill{height:100%;border-radius:5px 0 0 5px;}
+  .barrow .val{font-size:12px;font-weight:700;text-align:right;}
+  .donut-wrap{display:flex;align-items:center;gap:18px;margin-top:6px;}
+  .donut-legend{display:flex;flex-direction:column;gap:9px;flex:1;}
+  .dlg-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;}
+  .dlg-left{display:flex;align-items:center;gap:7px;overflow:hidden;}
+  .dlg-dot{width:9px;height:9px;border-radius:2.5px;flex:none;}
+  .dlg-name{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dlg-val{font-weight:700;flex:none;}
+  .compare-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px;}
+  .compare-col{text-align:center;}
+  .compare-col .cname{font-size:11px;font-weight:700;margin-bottom:8px;}
+  .compare-bars{display:flex;align-items:flex-end;justify-content:center;gap:6px;height:150px;}
+  .cbar{width:26px;border-radius:5px 5px 0 0;position:relative;display:flex;align-items:flex-start;justify-content:center;}
+  .cbar span{position:absolute;top:-19px;font-size:11.5px;font-weight:700;color:var(--ink);}
+  .compare-key{display:flex;gap:14px;justify-content:center;margin-top:12px;}
+  .trend-svg{width:100%;height:190px;}
+  .trend-legend{display:flex;gap:16px;margin-top:4px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;font-size:10.8px;text-transform:uppercase;letter-spacing:.4px;color:var(--ink-soft);font-weight:600;padding:0 10px 10px;border-bottom:1px solid var(--line);}
+  tbody td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  .rid{font-weight:700;color:var(--brand-deep);white-space:nowrap;}
+  .desc-cell{max-width:300px;color:var(--ink);}
+  .dept-cell{color:var(--ink-soft);font-size:12px;}
+  .score-pill{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:3px 8px;border-radius:6px;font-weight:700;font-size:12px;}
+  .arrow{color:var(--ink-soft);margin:0 4px;font-size:11px;}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);}
+  .legend-dot{width:10px;height:10px;border-radius:3px;flex:none;}
+  footer{margin-top:8px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11.5px;color:var(--ink-soft);}
+  .section{display:none;}
+  .section.active{display:block;}
+  .empty-note{font-size:12px;color:var(--ink-soft);font-style:italic;padding:20px 0;text-align:center;}
+  #updateModal{display:none;position:fixed;inset:0;background:rgba(10,20,16,.55);z-index:50;align-items:center;justify-content:center;}
+  #updateModal.show{display:flex;}
+  .modal-box{background:var(--panel);border-radius:14px;padding:26px 28px;max-width:440px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .modal-box h3{margin:0 0 8px;font-size:16px;}
+  .modal-box p{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0 0 16px;}
+  .modal-box input[type=file]{width:100%;font-size:13px;margin-bottom:14px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+  .modal-actions button{font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;}
+  .modal-actions button.primary{background:var(--brand-deep);color:#fff;border-color:var(--brand-deep);}
+  #statusMsg{font-size:12.5px;margin-top:10px;min-height:18px;}
+  #statusMsg.ok{color:var(--low);}
+  #statusMsg.err{color:var(--crit);}
+  @media (max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr);}.row-2,.row-3,.row-2b{grid-template-columns:1fr;}}
+  @media (max-width:620px){.kpis{grid-template-columns:1fr;}.wrap{padding:0 16px 40px;}.header-inner{padding:0 16px;}.header-meta{gap:16px;}.tabbar{padding:0 16px;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div class="brand-text">
+        <div class="name">Abana &nbsp;·&nbsp; GRC</div>
+        <h1>Enterprise Risk Register Dashboard</h1>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-meta" id="headerMeta"></div>
+      <button class="update-btn" id="openUpdateBtn">⟳ Update from Register</button>
+    </div>
+  </div>
+  <div class="tabbar">
+    <div class="tab active" data-target="threats">A · Operational Risks <span class="sub">Threats — self-assessment</span></div>
+    <div class="tab" data-target="opps">B · Opportunities <span class="sub">Positive risks</span></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ============ SECTION A ============ -->
+  <div class="section active" id="section-threats">
+    <div class="subbar">
+      <div class="breadcrumb">Governance, Risk &amp; Compliance &nbsp;›&nbsp; <b>Section A — Operational Risks (Threats)</b></div>
+      <div class="chips"><span class="chip on" id="chipThreatCount">— confirmed threats</span></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;">
+      <span class="chip">Extreme/Critical ≥20</span><span class="chip">High/Major 10–19</span><span class="chip">Medium 5–9</span><span class="chip">Low &lt;5</span>
+    </div>
+    <div class="kpis" id="kpiRowT"></div>
+    <div class="row-2">
+      <div class="panel">
+        <h2>Inherent vs. Residual Risk</h2>
+        <div class="desc">Effect of existing controls on risk exposure</div>
+        <div class="compare-grid" id="compareGrid"></div>
+        <div class="compare-key">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--brand-deep)"></span>Inherent</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Residual</div>
+        </div>
+      </div>
+      <div class="panel">
+        <h2>Risk Trend — Average Score by Year</h2>
+        <div class="desc">Inherent vs. residual average score across the register</div>
+        <svg class="trend-svg" id="trendSvg" viewBox="0 0 500 190"></svg>
+        <div class="trend-legend">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--brand-deep)"></span>Inherent</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Residual</div>
+        </div>
+      </div>
+    </div>
+    <div class="row-3">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Exposure by Department</h2>
+          <div class="toggle" id="deptToggle"><button data-mode="ch" class="active">Critical &amp; High</button><button data-mode="avg">Avg. Score</button></div>
+        </div>
+        <div class="desc">Top departments by unresolved severe exposure</div>
+        <div class="barlist" id="deptBars"></div>
+      </div>
+      <div class="panel">
+        <h2>Action Plan Urgency</h2>
+        <div class="desc">Confirmed risks by required response time</div>
+        <div class="barlist" id="urgBars"></div>
+      </div>
+      <div class="panel">
+        <h2>Risk Response</h2>
+        <div class="desc">How each threat is being handled</div>
+        <div class="donut-wrap"><svg id="donutSvg" width="120" height="120" viewBox="0 0 128 128"></svg><div class="donut-legend" id="donutLegend"></div></div>
+      </div>
+    </div>
+    <div class="row-2b">
+      <div class="panel">
+        <h2>Risk by Category</h2>
+        <div class="desc">Enterprise taxonomy</div>
+        <div class="barlist" id="catBars"></div>
+      </div>
+      <div class="panel">
+        <h2>Risk Status</h2>
+        <div class="desc">Per official register status categories</div>
+        <div class="barlist" id="statusBars"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Highest-Priority Risks Requiring Attention</h2>
+      <div class="desc">Top by inherent risk score</div>
+      <div style="overflow-x:auto;"><table><thead><tr><th>ID</th><th>Department</th><th>Risk description</th><th>Inherent → Residual</th><th>Category</th><th>Owner</th><th>Status</th></tr></thead><tbody id="riskTableBody"></tbody></table></div>
+    </div>
+    <footer><div id="footerNoteT"></div><div id="genDateT"></div></footer>
+  </div>
+
+  <!-- ============ SECTION B ============ -->
+  <div class="section" id="section-opps">
+    <div class="subbar">
+      <div class="breadcrumb">Governance, Risk &amp; Compliance &nbsp;›&nbsp; <b>Section B — Opportunities (Positive Risks)</b></div>
+      <div class="chips"><span class="chip on opp" id="chipOppCount">— confirmed opportunities</span></div>
+    </div>
+    <div class="kpis" id="kpiRowO" style="grid-template-columns:repeat(4,1fr);"></div>
+    <div class="row-2">
+      <div class="panel">
+        <h2>Opportunity Priority Distribution</h2>
+        <div class="desc">By official scoring band</div>
+        <div class="compare-grid" id="oppBandGrid"></div>
+      </div>
+      <div class="panel">
+        <h2>Opportunity Response</h2>
+        <div class="desc">Exploit · Enhance · Share · Reject</div>
+        <div class="barlist" id="oppRespBars"></div>
+      </div>
+    </div>
+    <div class="row-2">
+      <div class="panel">
+        <h2>Exposure by Department</h2>
+        <div class="desc">Average opportunity score — where the strongest upside is concentrated</div>
+        <div class="barlist" id="oppDeptBars"></div>
+      </div>
+      <div class="panel">
+        <h2>Opportunity Status</h2>
+        <div class="desc">Progress toward realization</div>
+        <div class="barlist" id="oppStatusBars"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Highest-Value Opportunities</h2>
+      <div class="desc">Top opportunities by score</div>
+      <div style="overflow-x:auto;"><table><thead><tr><th>ID</th><th>Department</th><th>Opportunity description</th><th>Score</th><th>Post-action</th><th>Owner</th></tr></thead><tbody id="oppTableBody"></tbody></table></div>
+    </div>
+    <footer><div id="footerNoteO"></div><div id="genDateO"></div></footer>
+  </div>
+
+</div>
+
+<!-- Update modal -->
+<div id="updateModal">
+  <div class="modal-box">
+    <h3>Update from Register</h3>
+    <p>Select an updated "Enterprise Risk Assessment Register" workbook (same format, sheet "Risk Assessment Report"). The dashboard recalculates entirely in your browser — nothing is uploaded anywhere.</p>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div id="statusMsg"></div>
+    <div class="modal-actions">
+      <button id="cancelUpdateBtn">Cancel</button>
+      <button class="primary" id="applyUpdateBtn">Refresh Dashboard</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = {crit:'#B3271E', high:'#D97B29', med:'#C79A2B', low:'#3E8E5B', brand:'#0B3D2E', brandMid:'#175C44', gold:'#B08A34', opp:'#2E6E8E'};
+function threatBucketColor(score){ if(score>=20) return COLORS.crit; if(score>=10) return COLORS.high; if(score>=5) return COLORS.med; return COLORS.low; }
+function threatBucketBg(score){ if(score>=20) return 'var(--crit-bg)'; if(score>=10) return 'var(--high-bg)'; if(score>=5) return 'var(--med-bg)'; return 'var(--low-bg)'; }
+function oppBucketColor(score){ if(score>=20) return COLORS.crit; if(score>=10) return COLORS.high; if(score>=5) return COLORS.opp; return COLORS.low; }
+function esc(s){ return (s===null||s===undefined) ? '—' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function hexA(hex, alpha){ const c=hex.replace('#',''); const r=parseInt(c.substr(0,2),16),g=parseInt(c.substr(2,2),16),b=parseInt(c.substr(4,2),16); return `rgba(${r},${g},${b},${alpha})`; }
+
+let DATA = {"threats": {"n_total": 293, "unacceptable": 62, "inh_counts": {"Extreme/Critical": 2, "High/Major": 60, "Medium": 118, "Low": 112}, "res_counts": {"Extreme/Critical": 0, "High/Major": 4, "Medium": 52, "Low": 228}, "avg_inh": 6.8, "avg_res": 3.6, "reduction_pct": 46.0, "dept_list": [{"name": "Branding & Marketing", "total": 12, "avg": 12.0, "ch": 10}, {"name": "Project Management", "total": 16, "avg": 11.2, "ch": 10}, {"name": "IT Development / Head Office", "total": 11, "avg": 10.1, "ch": 6}, {"name": "Warehouse  - Riyadh", "total": 10, "avg": 9.6, "ch": 6}, {"name": "IT Infrastructure", "total": 40, "avg": 5.5, "ch": 4}, {"name": "ISMS", "total": 77, "avg": 5.1, "ch": 4}, {"name": "Customer Care / Riyadh", "total": 3, "avg": 14.7, "ch": 3}, {"name": "Contract and Bid", "total": 5, "avg": 12.4, "ch": 3}, {"name": "Procurement / Riyadh", "total": 8, "avg": 10.5, "ch": 3}, {"name": "Administration", "total": 9, "avg": 8.6, "ch": 3}], "status_list": [{"name": "Open", "value": 170}, {"name": "Under Treatment", "value": 70}, {"name": "Monitoring", "value": 9}, {"name": "Accepted", "value": 30}, {"name": "Closed", "value": 14}, {"name": "Escalated", "value": 0}], "resp_list": [{"name": "REDUCE OR MITIGATE", "value": 238}, {"name": "TRANSFER", "value": 9}, {"name": "ACCEPT", "value": 41}, {"name": "AVOID", "value": 4}], "cat_list": [{"name": "Technology", "value": 120}, {"name": "Operational", "value": 100}, {"name": "Compliance & Legal", "value": 30}, {"name": "Human Capital", "value": 13}, {"name": "Organizational Continuity", "value": 13}, {"name": "Strategic", "value": 8}, {"name": "Financial", "value": 6}, {"name": "Reputation", "value": 2}], "urg_list": [{"name": "Immediate Action Required", "value": 45}, {"name": "Action Required - Near Term", "value": 42}, {"name": "Monitor & Schedule Action", "value": 19}, {"name": "Monitor - Periodic Review", "value": 9}, {"name": "Monitor - Low Priority", "value": 164}, {"name": "Closed - Periodic Review Only", "value": 13}], "yr_list": [{"year": "2023", "count": 9, "inh": 5.3, "res": 2.4}, {"year": "2024", "count": 5, "inh": 6.8, "res": 4.2}, {"year": "2025", "count": 166, "inh": 5.5, "res": 3.0}, {"year": "2026", "count": 113, "inh": 8.9, "res": 4.6}], "top_list": [{"id": "NR06-2026", "dept": "IT Development / Head Office", "desc": "Insecure software code may introduce security vulnerabilities", "inh": 20.0, "res": 12.0, "owner": "Atheer AlKhalifah", "status": "Open", "category": "Technology", "response": "REDUCE OR MITIGATE"}, {"id": "NR12-2026", "dept": "Project Management", "desc": "Delays in equipment delivery due to international logistics disruptions, geopolitical crisis, ven...", "inh": 20.0, "res": 6.0, "owner": "Procurement, Product Management", "status": "Open", "category": "Operational", "response": "REDUCE OR MITIGATE"}, {"id": "NR01-2026", "dept": "Customer Care / Riyadh", "desc": "Failure to update ERP remarks for all tickets consistently and completely", "inh": 16.0, "res": 8.0, "owner": "TSD Manager", "status": "Open", "category": "Operational", "response": "REDUCE OR MITIGATE"}, {"id": "NR03-2026", "dept": "Customer Care / Riyadh", "desc": "Slow response and delayed implementation of requests for ERP system updates, enhancements, or mod...", "inh": 16.0, "res": 8.0, "owner": "IT Manager", "status": "Open", "category": "Operational", "response": "TRANSFER"}, {"id": "NR01-2026", "dept": "Business Development & Product Management", "desc": "Saturation of existing major product lines in the banking sector due to product lifecycle maturit...", "inh": 16.0, "res": 8.0, "owner": "BD Manager", "status": "Open", "category": "Strategic", "response": "REDUCE OR MITIGATE"}, {"id": "NR-03-2026", "dept": "Contract and Bid ", "desc": "Delay in obtaining internal approvals and authorized signatures for contracts.", "inh": 16.0, "res": 2.0, "owner": "Contract Department / Management", "status": "Open", "category": "Compliance & Legal", "response": "REDUCE OR MITIGATE"}, {"id": "NR-04-2026", "dept": "Contract and Bid ", "desc": "Delay in contract renewal due to lack of timely response from the Sales Department.", "inh": 16.0, "res": 2.0, "owner": "Contract Department / Sales Department", "status": "Under Treatment", "category": "Operational", "response": "REDUCE OR MITIGATE"}, {"id": "NR05-2026", "dept": "Branding & Marketing ", "desc": "Failure to differentiate ABANA from competitors in messaging, positioning and value proposition.", "inh": 16.0, "res": 8.0, "owner": "Marketing Director & Business Development Manager", "status": "Open", "category": "Strategic", "response": "REDUCE OR MITIGATE"}, {"id": "NR08-2026", "dept": "Procurement / Riyadh", "desc": "Subcontractor non-compliance with QHS requirements", "inh": 16.0, "res": null, "owner": "Saleh Mubarak", "status": "Open", "category": "Operational", "response": "REDUCE OR MITIGATE"}, {"id": "NR05-2026", "dept": "Project Management", "desc": "Stakeholder communication failure", "inh": 16.0, "res": 4.0, "owner": "PMO Head", "status": "Open", "category": "Operational", "response": "REDUCE OR MITIGATE"}, {"id": "NR15-2026", "dept": "Project Management", "desc": "Technical teams lack the necessary skills for new technologies or machines.", "inh": 16.0, "res": 6.0, "owner": "PMO Head / TSD", "status": "Open", "category": "Human Capital", "response": "REDUCE OR MITIGATE"}, {"id": "NR05-2026", "dept": "IT Development / Head Office", "desc": "Knowledge Loss due to Employee Resignation", "inh": 15.0, "res": 8.0, "owner": "Atheer AlKhalifah", "status": "Open", "category": "Human Capital", "response": "REDUCE OR MITIGATE"}]}, "opportunities": {"n_total": 35, "inh_counts": {"Extreme / Critical": 1, "High / Major": 18, "Medium": 15, "Low": 1}, "avg_score": 10.9, "high_priority": 19, "dept_list": [{"name": "IT Infrastructure", "total": 2, "avg": 17.5}, {"name": "Business Development & Product Management", "total": 1, "avg": 16.0}, {"name": "Branding & Marketing", "total": 3, "avg": 14.0}, {"name": "Procurement / Riyadh", "total": 5, "avg": 12.2}, {"name": "IT Development / Head Office", "total": 2, "avg": 12.0}, {"name": "Contract and Bid", "total": 1, "avg": 12.0}, {"name": "Project Management", "total": 1, "avg": 12.0}, {"name": "Professional Services - Software Development and Support", "total": 2, "avg": 12.0}, {"name": "Warehouse  - Riyadh", "total": 2, "avg": 12.0}, {"name": "Administration", "total": 2, "avg": 10.5}, {"name": "Human Resources", "total": 1, "avg": 9.0}, {"name": "Telecom - OSP, ISP, SME", "total": 2, "avg": 9.0}, {"name": "Quality, Health and Safety / Riyadh", "total": 8, "avg": 8.2}, {"name": "Sales", "total": 2, "avg": 7.5}, {"name": "Technical Service  / Workshop", "total": 1, "avg": 4.0}], "cat_list": [], "resp_list": [{"name": "Exploit", "value": 1}, {"name": "Enhance", "value": 18}, {"name": "Share", "value": 15}, {"name": "Reject", "value": 1}], "status_list": [{"name": "Under Evaluation", "value": 26}, {"name": "In Progress", "value": 0}, {"name": "Realized", "value": 1}, {"name": "On Hold", "value": 2}, {"name": "Closed", "value": 6}, {"name": "Cancelled", "value": 0}], "top_list": [{"id": "PRPR01-2025", "dept": "IT Infrastructure", "desc": "The IT Security Team will implement the FortiMail Email Security Solution to enhance the organization's ema...", "score": 20.0, "post": null, "owner": "Infrastructure Manager"}, {"id": "PRPR01-2026", "dept": "Business Development & Product Management", "desc": "Capture increasing market demand driven by national shift toward electronic and digital payment solutions", "score": 16.0, "post": null, "owner": "\u2014"}, {"id": "PRPR01-2025", "dept": "Procurement / Riyadh", "desc": "Cost Savings", "score": 16.0, "post": null, "owner": "Buyers"}, {"id": "PRPR01-2026", "dept": "Branding & Marketing ", "desc": "Expand marketing into under-served sectors (healthcare, education, hospitality, retail) to broaden ABANA's ...", "score": 15.0, "post": 20.0, "owner": "\u2014"}, {"id": "PRPR02-2026", "dept": "Branding & Marketing ", "desc": "Use CSAT survey insights to shape campaign messaging and to generate customer testimonials and reference ca...", "score": 15.0, "post": 20.0, "owner": "\u2014"}, {"id": "PRPR02-2025", "dept": "IT Infrastructure", "desc": "Outsourcing Security Operations Center (SOC) to a managed third-party provider", "score": 15.0, "post": null, "owner": "CTO"}, {"id": "PRPR01-2026", "dept": "IT Development / Head Office", "desc": "Adopting new technology (AI, Process Maker, Security review)", "score": 12.0, "post": null, "owner": "Atheer AlKhalifah"}, {"id": "PRPR02-2026", "dept": "IT Development / Head Office", "desc": "Upskilling and Training Programs", "score": 12.0, "post": null, "owner": "Atheer AlKhalifah"}, {"id": "PRPR-01-2026", "dept": "Contract and Bid ", "desc": "Adopt AI-assisted tender analysis and bid-drafting tools to accelerate and strengthen proposals.", "score": 12.0, "post": 3.0, "owner": "\u2014"}, {"id": "PRPR03-2026", "dept": "Branding & Marketing ", "desc": "Consolidate agency and supplier spend and build in-house design and content capability.", "score": 12.0, "post": 16.0, "owner": "\u2014"}]}, "meta": {"total_records": 328}};
+let usingLiveFile = false;
+
+/* ============ TABS ============ */
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('section-'+tab.dataset.target).classList.add('active');
+  });
+});
+
+/* ============ MODAL WIRING ============ */
+const modal = document.getElementById('updateModal');
+document.getElementById('openUpdateBtn').addEventListener('click', ()=>{ modal.classList.add('show'); document.getElementById('statusMsg').textContent=''; document.getElementById('statusMsg').className=''; });
+document.getElementById('cancelUpdateBtn').addEventListener('click', ()=> modal.classList.remove('show'));
+document.getElementById('applyUpdateBtn').addEventListener('click', handleUpdate);
+
+function handleUpdate(){
+  const fileInput = document.getElementById('fileInput');
+  const statusEl = document.getElementById('statusMsg');
+  const file = fileInput.files[0];
+  if(!file){ statusEl.textContent = 'Choose a file first.'; statusEl.className='err'; return; }
+  statusEl.textContent = 'Reading workbook…'; statusEl.className='';
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:'array', cellDates:true});
+      const sheetName = wb.SheetNames.find(n => n.trim().toLowerCase() === 'risk assessment report') || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+      const newData = buildDataFromRows(rows);
+      DATA = newData;
+      usingLiveFile = true;
+      renderAll();
+      statusEl.textContent = `Loaded ${DATA.threats.n_total} threats and ${DATA.opportunities.n_total} opportunities. Dashboard refreshed.`;
+      statusEl.className = 'ok';
+      setTimeout(()=> modal.classList.remove('show'), 1400);
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = 'Could not read that file — make sure it is the Enterprise Risk Assessment Register workbook with its "Risk Assessment Report" sheet.';
+      statusEl.className = 'err';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+/* ============ CLIENT-SIDE REBUILD FROM RAW ROWS ============ */
+function normHeader(s){ return String(s||'').replace(/\s+/g,' ').trim().toLowerCase(); }
+
+const THREAT_FIELD_MAP = {
+  'risk id':'id', 'date added':'dateAdded', 'area / task name':'dept', 'risk description':'desc',
+  'impact of risk (brief descriptions)':'impactDesc', 'existing / ongoing controls':'controls',
+  'likelihood':'likLabel', 'likelihooh impact':'impLabel', 'likelihood score':'likScore', 'impact score':'impScore',
+  'risk score - total':'score', 'risk priority':'priority', 'risk action':'response', 'action plan':'actionPlan',
+  'risk owner / lead responsibility':'owner', 'date of review':'dateReview', 'result of review':'resultReview',
+  'risk status':'status', 'risk impact as':'category', 'residual risk score':'residual', 'remarks':'remarks',
+  'department / location':'deptLoc', 'year':'year', 'action plan urgency':'urgency'
+};
+const OPP_FIELD_MAP = {
+  'opp id':'id', 'date added':'dateAdded', 'area / task name':'dept', 'opportunity description':'desc',
+  'impact / benefit of opportunity (brief descriptions)':'impactDesc', 'existing / ongoing realization action':'controls',
+  'realization likelihood':'likLabel', 'benefit rating':'impLabel', 'realization likelihood score':'likScore',
+  'benefit score':'impScore', 'opportunity score':'score', 'opportunity priority':'priority',
+  'opportunity response':'response', 'action plan':'actionPlan', 'opportunity owner / lead responsibility':'owner',
+  'date of review':'dateReview', 'result of review':'resultReview', 'opportunity status':'status',
+  'post-action opportunity score':'residual', 'remarks':'remarks', 'department / location':'deptLoc', 'year':'year'
+};
+
+function extractSection(rows, bannerTest, fieldMap, idField){
+  let bannerIdx=-1, aveIdx=-1;
+  for(let i=0;i<rows.length;i++){
+    const v = rows[i] && rows[i][0];
+    if(typeof v==='string'){
+      if(bannerIdx===-1 && bannerTest(v)) bannerIdx=i;
+      else if(bannerIdx!==-1 && aveIdx===-1 && v.trim()==='AVE. SCORE:') { aveIdx=i; break; }
+    }
+  }
+  if(bannerIdx===-1) return [];
+  const headerIdx = bannerIdx+1;
+  const headerRow = rows[headerIdx] || [];
+  const colMap = {};
+  headerRow.forEach((h,ci)=>{
+    const key = normHeader(h);
+    if(fieldMap[key]) colMap[fieldMap[key]] = ci;
+  });
+  const dataStart = headerIdx+1;
+  const dataEnd = aveIdx===-1 ? rows.length : aveIdx;
+  const out = [];
+  for(let r=dataStart; r<dataEnd; r++){
+    const row = rows[r];
+    if(!row) continue;
+    const idVal = colMap[idField]!==undefined ? row[colMap[idField]] : null;
+    if(idVal===null || idVal==='' || idVal==='AVE. SCORE:') continue;
+    const obj = {};
+    Object.keys(colMap).forEach(fn => obj[fn] = row[colMap[fn]] === undefined ? null : row[colMap[fn]]);
+    out.push(obj);
+  }
+  return out;
+}
+
+function num(v){ if(v===null||v===undefined||v==='') return null; const n = Number(v); return isNaN(n) ? null : n; }
+function yr(v){ if(v===null||v===undefined||v==='') return null; if(v instanceof Date) return v.getFullYear(); const n = Number(v); return isNaN(n) ? null : Math.trunc(n); }
+
+function bucketThreat(s){ if(s===null) return null; if(s>=20) return 'Extreme/Critical'; if(s>=10) return 'High/Major'; if(s>=5) return 'Medium'; return 'Low'; }
+function bucketOpp(s){ if(s===null) return null; if(s>=20) return 'Extreme / Critical'; if(s>=10) return 'High / Major'; if(s>=5) return 'Medium'; return 'Low'; }
+
+function buildDataFromRows(rows){
+  const threats = extractSection(rows, v=>/OPERATIONAL RISKS/i.test(v), THREAT_FIELD_MAP, 'id');
+  const opps = extractSection(rows, v=>/OPPORTUNITIES/i.test(v), OPP_FIELD_MAP, 'id');
+
+  const scores = threats.map(t=>num(t.score)).filter(s=>s!==null);
+  const unacceptable = scores.filter(s=>s>=10).length;
+  const inhCountsMap = {}; threats.forEach(t=>{ if(t.priority) inhCountsMap[t.priority]=(inhCountsMap[t.priority]||0)+1; });
+  const order = ['Extreme/Critical','High/Major','Medium','Low'];
+  const inh_counts = {}; order.forEach(k=>inh_counts[k]=inhCountsMap[k]||0);
+  const resBuckets = threats.map(t=>{ const r=num(t.residual); return (r!==null && r!==0) ? bucketThreat(r) : null; }).filter(Boolean);
+  const res_counts = {}; order.forEach(k=>res_counts[k]=resBuckets.filter(b=>b===k).length);
+  const avg_inh = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length*10)/10 : 0;
+  const residVals = threats.map(t=>num(t.residual)).filter(r=>r!==null && r!==0);
+  const avg_res = residVals.length ? Math.round(residVals.reduce((a,b)=>a+b,0)/residVals.length*10)/10 : 0;
+  const pairs = threats.filter(t=>num(t.score) && num(t.residual)).map(t=>[num(t.score),num(t.residual)]);
+  const reduction_pct = pairs.length ? Math.round((pairs.reduce((a,p)=>a+(p[0]-p[1]),0)/pairs.reduce((a,p)=>a+p[0],0))*1000)/10 : 0;
+
+  const deptStats = {};
+  threats.forEach(t=>{
+    const d = (t.dept || t.deptLoc || 'Unknown').trim();
+    if(!deptStats[d]) deptStats[d] = {total:0, scores:[], ch:0};
+    deptStats[d].total++;
+    const s = num(t.score); if(s!==null) deptStats[d].scores.push(s);
+    if(t.priority==='Extreme/Critical' || t.priority==='High/Major') deptStats[d].ch++;
+  });
+  let dept_list = Object.keys(deptStats).map(d=>{
+    const v = deptStats[d];
+    const avg = v.scores.length ? Math.round(v.scores.reduce((a,b)=>a+b,0)/v.scores.length*10)/10 : 0;
+    return {name:d, total:v.total, avg, ch:v.ch};
+  });
+  dept_list.sort((a,b)=>b.ch-a.ch);
+  dept_list = dept_list.slice(0,10);
+
+  const statusOrder = ['Open','Under Treatment','Monitoring','Accepted','Closed','Escalated'];
+  const status_list = statusOrder.map(k=>({name:k, value:threats.filter(t=>t.status===k).length}));
+
+  const respOrder = ['REDUCE OR MITIGATE','TRANSFER','ACCEPT','AVOID'];
+  const resp_list = respOrder.map(k=>({name:k, value:threats.filter(t=>t.response===k).length})).filter(x=>x.value>0);
+
+  const urgCounts = {};
+  threats.forEach(t=>{ if(t.urgency) urgCounts[t.urgency]=(urgCounts[t.urgency]||0)+1; });
+  const urgOrder = ['Immediate Action Required','Action Required - Near Term','Monitor & Schedule Action','Monitor - Periodic Review','Monitor - Low Priority','Closed - Periodic Review Only'];
+  const urg_list = urgOrder.map(k=>({name:k, value:urgCounts[k]||0})).filter(x=>x.value>0);
+
+  const catCounts = {};
+  threats.forEach(t=>{ if(t.category) catCounts[t.category]=(catCounts[t.category]||0)+1; });
+  const cat_list = Object.keys(catCounts).map(k=>({name:k,value:catCounts[k]})).sort((a,b)=>b.value-a.value).slice(0,9);
+
+  const yrStats = {};
+  threats.forEach(t=>{ const y=yr(t.year); if(y===null) return; if(!yrStats[y]) yrStats[y]={count:0,inh:[],res:[]}; yrStats[y].count++; const s=num(t.score); if(s!==null) yrStats[y].inh.push(s); const r=num(t.residual); if(r!==null&&r!==0) yrStats[y].res.push(r); });
+  const yr_list = Object.keys(yrStats).sort().map(y=>{ const v=yrStats[y]; return {year:String(y), count:v.count, inh: v.inh.length?Math.round(v.inh.reduce((a,b)=>a+b,0)/v.inh.length*10)/10:0, res: v.res.length?Math.round(v.res.reduce((a,b)=>a+b,0)/v.res.length*10)/10:0}; });
+
+  const top_list = threats.filter(t=>num(t.score)!==null).sort((a,b)=>num(b.score)-num(a.score)).slice(0,12).map(t=>{
+    let desc = String(t.desc||''); if(desc.length>100) desc = desc.slice(0,97)+'...';
+    return { id:t.id, dept:t.dept||t.deptLoc, desc, inh:num(t.score), res:(num(t.residual)!==0?num(t.residual):null), owner:t.owner||'—', status:t.status||'Open', category:t.category||'Operational', response:t.response||'—' };
+  });
+
+  const threats_out = { n_total: threats.length, unacceptable, inh_counts, res_counts, avg_inh, avg_res, reduction_pct, dept_list, status_list, resp_list, urg_list, cat_list, yr_list, top_list };
+
+  const oScores = opps.map(o=>num(o.score)).filter(s=>s!==null);
+  const oInhMap = {}; oScores.forEach(s=>{ const b=bucketOpp(s); oInhMap[b]=(oInhMap[b]||0)+1; });
+  const oOrder = ['Extreme / Critical','High / Major','Medium','Low'];
+  const o_inh_counts = {}; oOrder.forEach(k=>o_inh_counts[k]=oInhMap[k]||0);
+  const avg_opp = oScores.length ? Math.round(oScores.reduce((a,b)=>a+b,0)/oScores.length*10)/10 : 0;
+  const high_priority = o_inh_counts['Extreme / Critical']+o_inh_counts['High / Major'];
+
+  const oDeptStats = {};
+  opps.forEach(o=>{ const d=(o.dept||o.deptLoc||'Unknown').trim(); if(!oDeptStats[d]) oDeptStats[d]={total:0,scores:[]}; oDeptStats[d].total++; const s=num(o.score); if(s!==null) oDeptStats[d].scores.push(s); });
+  let o_dept_list = Object.keys(oDeptStats).map(d=>{ const v=oDeptStats[d]; const avg=v.scores.length?Math.round(v.scores.reduce((a,b)=>a+b,0)/v.scores.length*10)/10:0; return {name:d,total:v.total,avg}; });
+  o_dept_list.sort((a,b)=>b.avg-a.avg);
+
+  const oRespCounts={}; opps.forEach(o=>{ if(o.response) oRespCounts[o.response]=(oRespCounts[o.response]||0)+1; });
+  const oRespOrder=['Exploit','Enhance','Share','Reject'];
+  const o_resp_list = oRespOrder.map(k=>({name:k,value:oRespCounts[k]||0})).filter(x=>x.value>0);
+
+  const oStatusCounts={}; opps.forEach(o=>{ if(o.status) oStatusCounts[o.status]=(oStatusCounts[o.status]||0)+1; });
+  const oStatusOrder=['Under Evaluation','In Progress','Realized','On Hold','Closed','Cancelled'];
+  const o_status_list = oStatusOrder.map(k=>({name:k,value:oStatusCounts[k]||0}));
+
+  const o_top_list = opps.filter(o=>num(o.score)!==null).sort((a,b)=>num(b.score)-num(a.score)).slice(0,10).map(o=>{
+    let desc=String(o.desc||''); if(desc.length>110) desc=desc.slice(0,107)+'...';
+    return { id:o.id, dept:o.dept||o.deptLoc, desc, score:num(o.score), post:(num(o.residual)!==0?num(o.residual):null), owner:o.owner||'—' };
+  });
+
+  const opps_out = { n_total: opps.length, inh_counts:o_inh_counts, avg_score:avg_opp, high_priority, dept_list:o_dept_list, resp_list:o_resp_list, status_list:o_status_list, top_list:o_top_list };
+
+  return { threats: threats_out, opportunities: opps_out, meta:{ total_records: threats.length+opps.length } };
+}
+
+/* ============ RENDER ============ */
+function renderAll(){
+  const T = DATA.threats, O = DATA.opportunities;
+
+  document.getElementById('headerMeta').innerHTML = [
+    {n:T.n_total, l:'Confirmed threats'},
+    {n:T.unacceptable, l:'Unacceptable (≥10)'},
+    {n:O.n_total, l:'Confirmed opportunities'},
+    {n:T.reduction_pct+'%', l:'Avg. risk reduction'}
+  ].map(s=>`<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+
+  document.getElementById('chipThreatCount').textContent = T.n_total + ' confirmed threats';
+  document.getElementById('chipOppCount').textContent = O.n_total + ' confirmed opportunities';
+
+  document.getElementById('kpiRowT').innerHTML = [
+    {label:'Threats Assessed', value:T.n_total, sub:`Register total`, bar:COLORS.brandMid},
+    {label:'Unacceptable Risk (≥10)', value:T.unacceptable, sub:`<b>${T.inh_counts['Extreme/Critical']}</b> extreme · <b>${T.inh_counts['High/Major']}</b> high/major`, bar:COLORS.crit},
+    {label:'Avg. Inherent Score', value:T.avg_inh, sub:`Residual avg. <b>${T.avg_res}</b>`, bar:COLORS.high},
+    {label:'Risk Reduction Achieved', value:T.reduction_pct+'%', sub:'via controls & treatment', bar:COLORS.gold},
+    {label:'Escalated Risks', value:(T.status_list.find(s=>s.name==='Escalated')||{value:0}).value, sub:'needing top-management review', bar:COLORS.low}
+  ].map(i=>`<div class="kpi"><div class="bar" style="background:${i.bar}"></div><div class="label">${i.label}</div><div class="value">${i.value}</div><div class="sub">${i.sub}</div></div>`).join('');
+
+  (function(){ try {
+    const el = document.getElementById('compareGrid');
+    const order = ['Extreme/Critical','High/Major','Medium','Low'];
+    const shortName = {'Extreme/Critical':'Extreme/ Critical','High/Major':'High/ Major','Medium':'Medium','Low':'Low'};
+    const maxV = Math.max(1,...order.map(k=>Math.max(T.inh_counts[k]||0, T.res_counts[k]||0)));
+    const scale = v=>Math.max(4,(v/maxV)*130);
+    el.innerHTML = order.map(k=>{
+      const iv=T.inh_counts[k]||0, rv=T.res_counts[k]||0;
+      const cc = k==='Extreme/Critical'?COLORS.crit:k==='High/Major'?COLORS.high:k==='Medium'?COLORS.med:COLORS.low;
+      return `<div class="compare-col"><div class="cname" style="color:${cc}">${shortName[k]}</div><div class="compare-bars"><div class="cbar" style="height:${scale(iv)}px;background:${COLORS.brand};"><span>${iv}</span></div><div class="cbar" style="height:${scale(rv)}px;background:${COLORS.gold};"><span>${rv}</span></div></div></div>`;
+    }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const svg = document.getElementById('trendSvg');
+    const list = T.yr_list;
+    if(!list.length){ svg.innerHTML=''; return; }
+    const W=500,H=190,padL=32,padR=16,padT=18,padB=30;
+    const maxV = Math.max(1,...list.map(d=>Math.max(d.inh,d.res)))*1.15;
+    const stepX = list.length>1 ? (W-padL-padR)/(list.length-1) : 0;
+    const xAt = i=> padL + i*stepX;
+    const yAt = v=> H-padB - (v/maxV)*(H-padT-padB);
+    let grid=''; for(let g=0;g<=4;g++){ const gy=padT+g*((H-padT-padB)/4); grid+=`<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>`; }
+    function linePath(key){ return list.map((d,i)=>(i===0?'M':'L')+xAt(i)+' '+yAt(d[key])).join(' '); }
+    function dots(key,color){ return list.map((d,i)=>`<circle cx="${xAt(i)}" cy="${yAt(d[key])}" r="4" fill="${color}"/><text x="${xAt(i)}" y="${yAt(d[key])-10}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${d[key]}</text>`).join(''); }
+    const xlabels = list.map((d,i)=>`<text x="${xAt(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-soft)">${d.year}</text>`).join('');
+    svg.innerHTML = `${grid}<path d="${linePath('inh')}" fill="none" stroke="${COLORS.brand}" stroke-width="2.5"/><path d="${linePath('res')}" fill="none" stroke="${COLORS.gold}" stroke-width="2.5"/>${dots('inh',COLORS.brand)}${dots('res',COLORS.gold)}${xlabels}`;
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  renderDeptBars('ch');
+
+  (function(){ try {
+    const el = document.getElementById('urgBars');
+    const list = T.urg_list;
+    if(!list.length){ el.innerHTML = '<div class="empty-note">No urgency data in this file</div>'; return; }
+    const maxV = Math.max(1,...list.map(d=>d.value));
+    const cmap = {'Immediate Action Required':COLORS.crit,'Action Required - Near Term':COLORS.high,'Monitor & Schedule Action':COLORS.med,'Monitor - Periodic Review':COLORS.med,'Monitor - Low Priority':COLORS.low,'Closed - Periodic Review Only':'#8A9A92'};
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.value/maxV)*100); return `<div class="barrow"><div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${cmap[d.name]||COLORS.brand};"></div></div><div class="val">${d.value}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const svg = document.getElementById('donutSvg'); const legend = document.getElementById('donutLegend');
+    const list = T.resp_list; const total = list.reduce((a,b)=>a+b.value,0);
+    if(!total){ svg.innerHTML=''; legend.innerHTML='<div class="empty-note">No data</div>'; return; }
+    const palette=[COLORS.brand,COLORS.gold,'#8A9A92',COLORS.crit];
+    let angle=-90; const cx=64,cy=64,r=50,rInner=30; let paths='';
+    list.forEach((d,i)=>{ const frac=d.value/total; const sweep=frac*360; const large=sweep>180?1:0;
+      const a0=angle*Math.PI/180,a1=(angle+sweep)*Math.PI/180;
+      const x0=cx+r*Math.cos(a0),y0=cy+r*Math.sin(a0),x1=cx+r*Math.cos(a1),y1=cy+r*Math.sin(a1);
+      const xi0=cx+rInner*Math.cos(a1),yi0=cy+rInner*Math.sin(a1),xi1=cx+rInner*Math.cos(a0),yi1=cy+rInner*Math.sin(a0);
+      paths+=`<path d="M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} L ${xi0} ${yi0} A ${rInner} ${rInner} 0 ${large} 0 ${xi1} ${yi1} Z" fill="${palette[i%palette.length]}"><title>${esc(d.name)}: ${d.value}</title></path>`;
+      angle+=sweep; });
+    svg.innerHTML = paths + `<text x="64" y="60" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">${total}</text><text x="64" y="76" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">risks</text>`;
+    legend.innerHTML = list.map((d,i)=>`<div class="dlg-row"><div class="dlg-left"><span class="dlg-dot" style="background:${palette[i%palette.length]}"></span><span class="dlg-name">${esc(d.name)}</span></div><div class="dlg-val">${d.value}</div></div>`).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('catBars'); const list = T.cat_list;
+    if(!list.length){ el.innerHTML='<div class="empty-note">No category data</div>'; return; }
+    const maxV = Math.max(1,...list.map(d=>d.value));
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.value/maxV)*100); return `<div class="barrow"><div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${COLORS.brandMid};"></div></div><div class="val">${d.value}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('statusBars'); const list = T.status_list;
+    const cmap = {'Open':COLORS.crit,'Under Treatment':COLORS.high,'Monitoring':COLORS.med,'Accepted':'#8A9A92','Closed':COLORS.low,'Escalated':'#7A2F86'};
+    const maxV = Math.max(1,...list.map(d=>d.value));
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.value/maxV)*100); return `<div class="barrow"><div class="lbl">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${cmap[d.name]};"></div></div><div class="val">${d.value}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('riskTableBody');
+    const statusColor = s=>({'Open':{bg:'var(--crit-bg)',fg:'var(--crit)'},'Under Treatment':{bg:'var(--high-bg)',fg:'var(--high)'},'Monitoring':{bg:'var(--med-bg)',fg:'var(--med)'},'Accepted':{bg:'#EEF0EE',fg:'#5B6A63'},'Closed':{bg:'var(--low-bg)',fg:'var(--low)'},'Escalated':{bg:'#F1E5F4',fg:'#7A2F86'}}[s]||{bg:'var(--low-bg)',fg:'var(--low)'});
+    el.innerHTML = T.top_list.map(r=>{ const sc=statusColor(r.status);
+      return `<tr><td class="rid">${esc(r.id)}</td><td class="dept-cell">${esc(r.dept)}</td><td class="desc-cell">${esc(r.desc)}</td>
+      <td><span class="score-pill" style="background:${threatBucketBg(r.inh)};color:${threatBucketColor(r.inh)};">${r.inh}</span><span class="arrow">→</span><span class="score-pill" style="background:${r.res!==null?threatBucketBg(r.res):'var(--line)'};color:${r.res!==null?threatBucketColor(r.res):'var(--ink-soft)'};">${r.res!==null?r.res:'—'}</span></td>
+      <td class="dept-cell">${esc(r.category)}</td><td class="dept-cell">${esc(r.owner)}</td>
+      <td><span class="tag" style="background:${sc.bg};color:${sc.fg};">${esc(r.status)}</span></td></tr>`;
+    }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  document.getElementById('kpiRowO').innerHTML = [
+    {label:'Opportunities Assessed', value:O.n_total, sub:'Register total', bar:COLORS.opp},
+    {label:'High Priority (≥10)', value:O.high_priority, sub:'candidates to pursue or enhance', bar:COLORS.crit},
+    {label:'Avg. Opportunity Score', value:O.avg_score, sub:'realization likelihood × benefit', bar:COLORS.gold},
+    {label:'Extreme / Critical', value:O.inh_counts['Extreme / Critical']||0, sub:'maximize realization immediately', bar:COLORS.brand}
+  ].map(i=>`<div class="kpi"><div class="bar" style="background:${i.bar}"></div><div class="label">${i.label}</div><div class="value">${i.value}</div><div class="sub">${i.sub}</div></div>`).join('');
+
+  (function(){ try {
+    const el = document.getElementById('oppBandGrid');
+    const order = ['Extreme / Critical','High / Major','Medium','Low'];
+    const shortName = {'Extreme / Critical':'Extreme/ Critical','High / Major':'High/ Major','Medium':'Medium','Low':'Low'};
+    const maxV = Math.max(1,...order.map(k=>O.inh_counts[k]||0));
+    el.innerHTML = order.map(k=>{ const v=O.inh_counts[k]||0; const h=Math.max(4,(v/maxV)*130);
+      const cc = k==='Extreme / Critical'?COLORS.crit:k==='High / Major'?COLORS.high:k==='Medium'?COLORS.opp:COLORS.low;
+      return `<div class="compare-col"><div class="cname" style="color:${cc}">${shortName[k]}</div><div class="compare-bars"><div class="cbar" style="height:${h}px;background:${cc};"><span>${v}</span></div></div></div>`;
+    }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('oppRespBars'); const list = O.resp_list;
+    if(!list.length){ el.innerHTML='<div class="empty-note">No response data</div>'; return; }
+    const cmap = {'Exploit':COLORS.crit,'Enhance':COLORS.high,'Share':COLORS.opp,'Reject':'#8A9A92'};
+    const maxV = Math.max(1,...list.map(d=>d.value));
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.value/maxV)*100); return `<div class="barrow"><div class="lbl">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${cmap[d.name]||COLORS.opp};"></div></div><div class="val">${d.value}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('oppDeptBars'); const list = O.dept_list;
+    if(!list.length){ el.innerHTML='<div class="empty-note">No department data</div>'; return; }
+    const maxV = Math.max(1,...list.map(d=>d.avg));
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.avg/maxV)*100); return `<div class="barrow"><div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${oppBucketColor(d.avg)};"></div></div><div class="val">${d.avg}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('oppStatusBars'); const list = O.status_list;
+    const cmap = {'Under Evaluation':COLORS.med,'In Progress':COLORS.high,'Realized':COLORS.low,'On Hold':'#8A9A92','Closed':COLORS.brandMid,'Cancelled':COLORS.crit};
+    const maxV = Math.max(1,...list.map(d=>d.value));
+    el.innerHTML = list.map(d=>{ const pct=Math.max(3,(d.value/maxV)*100); return `<div class="barrow"><div class="lbl">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${cmap[d.name]};"></div></div><div class="val">${d.value}</div></div>`; }).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  (function(){ try {
+    const el = document.getElementById('oppTableBody');
+    el.innerHTML = O.top_list.map(r=>`<tr><td class="rid">${esc(r.id)}</td><td class="dept-cell">${esc(r.dept)}</td><td class="desc-cell">${esc(r.desc)}</td>
+      <td><span class="score-pill" style="background:${hexA(oppBucketColor(r.score),.15)};color:${oppBucketColor(r.score)};">${r.score}</span></td>
+      <td>${r.post!==null?`<span class="score-pill" style="background:${hexA(oppBucketColor(r.post),.15)};color:${oppBucketColor(r.post)};">${r.post}</span>`:'<span class="dept-cell">—</span>'}</td>
+      <td class="dept-cell">${esc(r.owner)}</td></tr>`).join('');
+  } catch(e){ console.error("Dashboard panel render error:", e); } })();
+
+  const now = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const noteT = usingLiveFile ? 'Data refreshed locally from an uploaded register file.' : 'Source: Enterprise Risk Assessment Register — Section A.';
+  const noteO = usingLiveFile ? 'Data refreshed locally from an uploaded register file.' : 'Source: Enterprise Risk Assessment Register — Section B.';
+  document.getElementById('footerNoteT').textContent = noteT;
+  document.getElementById('footerNoteO').textContent = noteO;
+  document.getElementById('genDateT').textContent = 'Generated ' + now;
+  document.getElementById('genDateO').textContent = 'Generated ' + now;
+}
+
+function renderDeptBars(mode){
+  try{
+    const T = DATA.threats;
+    const el = document.getElementById('deptBars');
+    const list = [...(T.dept_list||[])].sort((a,b)=> mode==='ch' ? b.ch-a.ch : b.avg-a.avg);
+    if(!list.length){ el.innerHTML = '<div class="empty-note">No department data</div>'; return; }
+    const maxV = Math.max(1, mode==='ch' ? Math.max(...list.map(d=>d.ch)) : Math.max(...list.map(d=>d.avg)));
+    el.innerHTML = list.map(d=>{
+      const v = mode==='ch' ? d.ch : d.avg;
+      const pct = Math.max(3,(v/maxV)*100);
+      const color = mode==='ch' ? (d.ch>=8?COLORS.crit:d.ch>=4?COLORS.high:COLORS.med) : threatBucketColor(d.avg);
+      return `<div class="barrow"><div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div><div class="track"><div class="fill" style="width:${pct}%;background:${color};"></div></div><div class="val">${v}</div></div>`;
+    }).join('');
+  }catch(e){ console.error('Dashboard panel render error:', e); }
+}
+document.getElementById('deptToggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#deptToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDeptBars(btn.dataset.mode);
+});
+
+try{ renderAll(); }catch(e){ console.error('Dashboard render error:', e); }
+</script>
+</body>
+</html>
