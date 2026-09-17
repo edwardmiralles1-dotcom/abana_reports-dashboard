@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABANA — Enterprise Risk Dashboard</title>
+<style>
+  :root{
+    --bg:#F4F5F2;
+    --panel:#FFFFFF;
+    --ink:#152420;
+    --ink-soft:#5B6A63;
+    --line:#E3E6E1;
+    --brand-deep:#0B3D2E;
+    --brand-mid:#175C44;
+    --brand-pale:#E8F0EC;
+    --gold:#B08A34;
+    --crit:#B3271E;
+    --crit-bg:#FBE8E6;
+    --high:#D97B29;
+    --high-bg:#FCEEDD;
+    --med:#C79A2B;
+    --med-bg:#FBF3DC;
+    --low:#3E8E5B;
+    --low-bg:#E7F3EA;
+    --radius:10px;
+    --shadow: 0 1px 2px rgba(15,30,24,0.05), 0 1px 10px rgba(15,30,24,0.04);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0E1512;
+      --panel:#151E1A;
+      --ink:#EAF0EC;
+      --ink-soft:#9BAAA2;
+      --line:#28352F;
+      --brand-pale:#152621;
+      --crit-bg:#3A211E;
+      --high-bg:#3A2C1A;
+      --med-bg:#372F17;
+      --low-bg:#1B2E22;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1512;
+    --panel:#151E1A;
+    --ink:#EAF0EC;
+    --ink-soft:#9BAAA2;
+    --line:#28352F;
+    --brand-pale:#152621;
+    --crit-bg:#3A211E;
+    --high-bg:#3A2C1A;
+    --med-bg:#372F17;
+    --low-bg:#1B2E22;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1360px;margin:0 auto;padding:0 28px 60px;}
+
+  /* Header */
+  header{
+    background:linear-gradient(135deg,var(--brand-deep) 0%, #0F4A38 60%, var(--brand-mid) 100%);
+    color:#F2F6F3;
+    padding:26px 0 22px;
+    margin-bottom:26px;
+  }
+  .header-inner{max-width:1360px;margin:0 auto;padding:0 28px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .mark{
+    width:44px;height:44px;border-radius:10px;
+    background:var(--gold);
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:20px;color:#0B3D2E;
+    flex:none;
+    letter-spacing:-0.5px;
+  }
+  .brand-text .name{font-size:13px;letter-spacing:2px;font-weight:600;color:#CFE3D8;text-transform:uppercase;}
+  .brand-text h1{margin:2px 0 0;font-size:22px;font-weight:600;color:#FFFFFF;letter-spacing:-0.2px;}
+  .header-meta{display:flex;gap:28px;flex-wrap:wrap;}
+  .header-meta .stat{text-align:right;}
+  .header-meta .stat .n{font-size:24px;font-weight:700;color:#FFFFFF;line-height:1;}
+  .header-meta .stat .l{font-size:11.5px;color:#BFDBCC;margin-top:5px;letter-spacing:0.2px;}
+
+  .subbar{
+    display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;
+    margin-bottom:22px;
+  }
+  .breadcrumb{font-size:13px;color:var(--ink-soft);}
+  .breadcrumb b{color:var(--ink);font-weight:600;}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .chip{
+    font-size:12.5px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink-soft);
+  }
+  .chip.on{background:var(--brand-pale);border-color:var(--brand-mid);color:var(--brand-deep);font-weight:600;}
+
+  /* KPI row */
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px;}
+  .kpi{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 18px 16px;box-shadow:var(--shadow);
+    position:relative;overflow:hidden;
+  }
+  .kpi .bar{position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .kpi .label{font-size:12px;color:var(--ink-soft);font-weight:500;margin-bottom:10px;}
+  .kpi .value{font-size:30px;font-weight:700;letter-spacing:-0.5px;line-height:1;}
+  .kpi .sub{font-size:12px;color:var(--ink-soft);margin-top:8px;}
+  .kpi .sub b{color:var(--ink);}
+  .kpi.c1 .bar{background:var(--brand-mid);}
+  .kpi.c2 .bar{background:var(--crit);}
+  .kpi.c3 .bar{background:var(--high);}
+  .kpi.c4 .bar{background:var(--gold);}
+  .kpi.c5 .bar{background:var(--low);}
+
+  /* panels */
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px 20px 20px;box-shadow:var(--shadow);
+  }
+  .panel h2{font-size:14.5px;margin:0 0 3px;font-weight:600;}
+  .panel .desc{font-size:12px;color:var(--ink-soft);margin-bottom:14px;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:2px;}
+  .toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none;}
+  .toggle button{
+    border:none;background:var(--panel);color:var(--ink-soft);font-size:11.5px;font-weight:600;
+    padding:6px 11px;cursor:pointer;font-family:inherit;
+  }
+  .toggle button.active{background:var(--brand-deep);color:#fff;}
+
+  .row-2{display:grid;grid-template-columns:1.15fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .row-3{display:grid;grid-template-columns:1.2fr 0.9fr 0.9fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .row-2b{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:16px;align-items:stretch;}
+
+  /* Matrix */
+  .matrix-wrap{display:flex;gap:10px;}
+  .matrix-y{display:flex;flex-direction:column;justify-content:space-between;font-size:11px;color:var(--ink-soft);padding:4px 0;writing-mode:vertical-rl;transform:rotate(180deg);text-align:center;font-weight:600;}
+  .matrix-body{flex:1;}
+  .matrix-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;}
+  .mcell{
+    aspect-ratio:1/1;border-radius:6px;display:flex;align-items:center;justify-content:center;
+    font-weight:700;font-size:15px;color:#3A241C;position:relative;
+  }
+  .matrix-x{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-top:6px;}
+  .matrix-x span{text-align:center;font-size:11px;color:var(--ink-soft);font-weight:600;}
+  .axis-label{font-size:10.5px;color:var(--ink-soft);text-align:center;margin-top:8px;font-weight:600;letter-spacing:0.3px;}
+  .legend-row{display:flex;gap:14px;margin-top:14px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink-soft);}
+  .legend-dot{width:10px;height:10px;border-radius:3px;flex:none;}
+
+  /* bars generic */
+  .barlist{display:flex;flex-direction:column;gap:10px;margin-top:6px;}
+  .barrow{display:grid;grid-template-columns:150px 1fr 34px;gap:10px;align-items:center;}
+  .barrow .lbl{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .barrow .track{height:16px;background:var(--brand-pale);border-radius:5px;overflow:hidden;position:relative;}
+  .barrow .fill{height:100%;border-radius:5px 0 0 5px;}
+  .barrow .val{font-size:12px;font-weight:700;text-align:right;}
+
+  /* donut + legend */
+  .donut-wrap{display:flex;align-items:center;gap:18px;margin-top:6px;}
+  .donut-legend{display:flex;flex-direction:column;gap:9px;flex:1;}
+  .dlg-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;}
+  .dlg-left{display:flex;align-items:center;gap:7px;overflow:hidden;}
+  .dlg-dot{width:9px;height:9px;border-radius:2.5px;flex:none;}
+  .dlg-name{color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dlg-val{font-weight:700;flex:none;}
+
+  /* priority compare */
+  .compare-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:8px;}
+  .compare-col{text-align:center;}
+  .compare-col .cname{font-size:11.5px;font-weight:700;margin-bottom:8px;letter-spacing:0.2px;}
+  .compare-bars{display:flex;align-items:flex-end;justify-content:center;gap:6px;height:150px;}
+  .cbar{width:26px;border-radius:5px 5px 0 0;position:relative;display:flex;align-items:flex-start;justify-content:center;}
+  .cbar span{position:absolute;top:-19px;font-size:11.5px;font-weight:700;color:var(--ink);}
+  .compare-key{display:flex;gap:14px;justify-content:center;margin-top:12px;}
+
+  /* trend */
+  .trend-svg{width:100%;height:190px;}
+  .trend-legend{display:flex;gap:16px;margin-top:4px;}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{
+    text-align:left;font-size:10.8px;text-transform:uppercase;letter-spacing:0.4px;
+    color:var(--ink-soft);font-weight:600;padding:0 10px 10px;border-bottom:1px solid var(--line);
+  }
+  tbody td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top;}
+  tbody tr:last-child td{border-bottom:none;}
+  .rid{font-weight:700;color:var(--brand-deep);}
+  .desc-cell{max-width:340px;color:var(--ink);}
+  .dept-cell{color:var(--ink-soft);font-size:12px;}
+  .score-pill{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:3px 8px;border-radius:6px;font-weight:700;font-size:12px;}
+  .arrow{color:var(--ink-soft);margin:0 4px;font-size:11px;}
+  .tag{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
+
+  footer{margin-top:8px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:11.5px;color:var(--ink-soft);}
+
+  @media (max-width:1080px){
+    .kpis{grid-template-columns:repeat(2,1fr);}
+    .row-2,.row-3,.row-2b{grid-template-columns:1fr;}
+  }
+  @media (max-width:620px){
+    .kpis{grid-template-columns:1fr;}
+    .wrap{padding:0 16px 40px;}
+    .header-inner{padding:0 16px;}
+    .header-meta{gap:16px;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="mark">A</div>
+      <div class="brand-text">
+        <div class="name">Abana &nbsp;·&nbsp; GRC</div>
+        <h1>Enterprise Risk Dashboard</h1>
+      </div>
+    </div>
+    <div class="header-meta" id="headerMeta"></div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="subbar">
+    <div class="breadcrumb">Governance, Risk &amp; Compliance &nbsp;›&nbsp; <b>Operational Risk Register</b> &nbsp;›&nbsp; FY2024–2026</div>
+    <div class="chips">
+      <span class="chip on">Confirmed risks only</span>
+      <span class="chip">228 of 256 assessed items</span>
+      <span class="chip">17 departments</span>
+    </div>
+  </div>
+
+  <!-- KPI ROW -->
+  <div class="kpis" id="kpiRow"></div>
+
+  <!-- ROW 2: Heat map + Inherent vs Residual -->
+  <div class="row-2">
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Inherent Risk Heat Map</h2>
+          <div class="desc">Likelihood × Impact — number of confirmed risks per zone</div>
+        </div>
+      </div>
+      <div class="matrix-wrap">
+        <div class="matrix-y">LIKELIHOOD →</div>
+        <div class="matrix-body">
+          <div class="matrix-grid" id="matrixGrid"></div>
+          <div class="matrix-x" id="matrixX"></div>
+          <div class="axis-label">IMPACT →</div>
+        </div>
+      </div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--low)"></span>Low (score 1–4)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--med)"></span>Medium (5–9)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--high)"></span>High (10–14)</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--crit)"></span>Critical (15–25)</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Inherent vs. Residual Risk</h2>
+      <div class="desc">Effect of controls &amp; treatment plans on risk exposure</div>
+      <div class="compare-grid" id="compareGrid"></div>
+      <div class="compare-key">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--brand-deep)"></span>Inherent</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Residual</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Department / Urgency / Treatment -->
+  <div class="row-3">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Exposure by Department</h2>
+        <div class="toggle" id="deptToggle">
+          <button data-mode="ch" class="active">Critical &amp; High</button>
+          <button data-mode="avg">Avg. Score</button>
+        </div>
+      </div>
+      <div class="desc">Top departments ranked by unresolved severe exposure</div>
+      <div class="barlist" id="deptBars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Action Plan Urgency</h2>
+      <div class="desc">228 confirmed risks by required response time</div>
+      <div class="barlist" id="urgBars"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Risk Treatment Strategy</h2>
+      <div class="desc">How each confirmed risk is being handled</div>
+      <div class="donut-wrap">
+        <svg id="donutSvg" width="128" height="128" viewBox="0 0 128 128"></svg>
+        <div class="donut-legend" id="donutLegend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 4: Trend + Category -->
+  <div class="row-2b">
+    <div class="panel">
+      <h2>Risk Trend — Average Score by Year</h2>
+      <div class="desc">Inherent vs. residual average risk score across the register</div>
+      <svg class="trend-svg" id="trendSvg" viewBox="0 0 700 190"></svg>
+      <div class="trend-legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--brand-deep)"></span>Avg. inherent score</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--gold)"></span>Avg. residual score</div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Top Risk Categories</h2>
+      <div class="desc">Standardized category, confirmed risks only</div>
+      <div class="barlist" id="catBars"></div>
+    </div>
+  </div>
+
+  <!-- ROW 5: Table -->
+  <div class="panel">
+    <h2>Highest-Priority Risks Requiring Attention</h2>
+    <div class="desc">Top 10 by inherent risk score — review owners and confirm mitigation progress</div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Department</th>
+            <th>Risk description</th>
+            <th>Inherent → Residual</th>
+            <th>Owner</th>
+            <th>Urgency</th>
+          </tr>
+        </thead>
+        <tbody id="riskTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    <div>Source: Consolidated Risk Register (Risk Assessment — ISO Compliance) · 256 line items reviewed, 228 confirmed as true risks</div>
+    <div id="genDate"></div>
+  </footer>
+
+</div>
+
+<script>
+const DATA = {
+  "total_records": 256,
+  "n_true": 228,
+  "n_not_risk": 28,
+  "inh_counts": {"Critical": 24, "High": 46, "Medium": 90, "Low": 67},
+  "res_counts": {"Critical": 5, "High": 5, "Medium": 47, "Low": 141},
+  "crit_high": 70,
+  "immediate": 45,
+  "reduction_pct": 42.5,
+  "avg_inh": 7.9,
+  "avg_res": 4.4,
+  "matrix": [[1,8,15,9,4],[3,16,19,12,5],[5,11,13,25,9],[9,14,4,8,2],[3,4,0,0,0]],
+  "dept_list": [
+    {"name":"Branding & Marketing Department","total":15,"avg":12.4,"ch":13},
+    {"name":"Project Management","total":17,"avg":11.2,"ch":11},
+    {"name":"IT Development / Head Office","total":13,"avg":10.4,"ch":8},
+    {"name":"Warehouse Department - Riyadh","total":10,"avg":9.6,"ch":6},
+    {"name":"IT Infrastructure","total":42,"avg":6.1,"ch":6},
+    {"name":"Administration Department","total":11,"avg":8.9,"ch":4},
+    {"name":"Professional Services - Software Dev. & Support","total":11,"avg":8.4,"ch":4},
+    {"name":"Contract and Bid Department","total":6,"avg":12.3,"ch":4}
+  ],
+  "treat_list": [
+    {"name":"Mitigate / Reduce","value":103},
+    {"name":"Accept","value":41},
+    {"name":"Exploit / Pursue","value":29},
+    {"name":"Transfer","value":9},
+    {"name":"Avoid","value":4}
+  ],
+  "urg_list": [
+    {"name":"Immediate Action Required","value":45},
+    {"name":"Action Required - Near Term","value":44},
+    {"name":"Monitor & Schedule Action","value":40},
+    {"name":"Monitor - Periodic Review","value":9},
+    {"name":"Monitor - Low Priority","value":72},
+    {"name":"Closed - Periodic Review Only","value":18}
+  ],
+  "yr_list": [
+    {"year":"2024","count":12,"inh":8.5,"res":4.2},
+    {"year":"2025","count":47,"inh":6.4,"res":3.3},
+    {"year":"2026","count":42,"inh":12.0,"res":7.4}
+  ],
+  "top_list": [
+    {"id":"NR06","dept":"IT Development / Head Office","desc":"Insecure software code may introduce security vulnerabilities","inh":20.0,"res":12.0,"owner":"Atheer AlKhalifah","urgency":"Immediate Action Required","priority":"Extreme"},
+    {"id":"NR12","dept":"Project Management","desc":"Delays in equipment delivery due to international logistics disruptions, geopolitical crisis...","inh":20.0,"res":6.0,"owner":"Procurement, Product Management","urgency":"Immediate Action Required","priority":"High"},
+    {"id":"PR01","dept":"IT Infrastructure","desc":"Implement FortiMail Email Security Solution to reduce risk of malware and phishing attacks","inh":20.0,"res":null,"owner":"Infrastructure Manager","urgency":"Action Required - Near Term","priority":"High"},
+    {"id":"PR01","dept":"Business Development & Product Mgmt","desc":"Capture increasing market demand from national shift toward digital payments","inh":16.0,"res":null,"owner":"—","urgency":"Action Required - Near Term","priority":"—"},
+    {"id":"NR-03","dept":"Contract and Bid Department","desc":"Delay in obtaining internal approvals and authorized signatures for contracts","inh":16.0,"res":2.0,"owner":"Contract Dept. / Management","urgency":"Immediate Action Required","priority":"High"},
+    {"id":"NR-04","dept":"Contract and Bid Department","desc":"Delay in contract renewal due to lack of timely response from Sales","inh":16.0,"res":2.0,"owner":"Contract Dept. / Sales","urgency":"Monitor - Periodic Review","priority":"High"},
+    {"id":"NR01","dept":"Business Development & Product Mgmt","desc":"Saturation of existing major product lines in the banking sector","inh":16.0,"res":8.0,"owner":"BD Manager","urgency":"Action Required - Near Term","priority":"Medium"},
+    {"id":"NR05","dept":"Branding & Marketing Department","desc":"Failure to differentiate ABANA from competitors in messaging & positioning","inh":16.0,"res":8.0,"owner":"Marketing Director / BD Manager","urgency":"Immediate Action Required","priority":"High"},
+    {"id":"NR05","dept":"Project Management","desc":"Stakeholder communication failure","inh":16.0,"res":4.0,"owner":"PMO Head","urgency":"Immediate Action Required","priority":"High"},
+    {"id":"NR03","dept":"Customer Care / Riyadh","desc":"Slow response and delayed ERP updates from the system provider","inh":16.0,"res":8.0,"owner":"IT Manager","urgency":"Immediate Action Required","priority":"High"}
+  ],
+  "cat_list": [
+    {"name":"IT / Infrastructure","value":19},
+    {"name":"Quality","value":17},
+    {"name":"Human Capital","value":11},
+    {"name":"Strategic / Market","value":11},
+    {"name":"Health & Safety","value":10},
+    {"name":"IT / Infrastructure (Network)","value":9},
+    {"name":"Regulatory / Compliance","value":8},
+    {"name":"Quality / Documentation","value":8}
+  ]
+};
+
+const COLORS = {crit:'#B3271E', high:'#D97B29', med:'#C79A2B', low:'#3E8E5B', brand:'#0B3D2E', brandMid:'#175C44', gold:'#B08A34'};
+function bucketColor(score){
+  if(score>=15) return COLORS.crit;
+  if(score>=10) return COLORS.high;
+  if(score>=5) return COLORS.med;
+  return COLORS.low;
+}
+function bucketBg(score){
+  if(score>=15) return 'var(--crit-bg)';
+  if(score>=10) return 'var(--high-bg)';
+  if(score>=5) return 'var(--med-bg)';
+  return 'var(--low-bg)';
+}
+function esc(s){ return (s===null||s===undefined) ? '' : String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+// ---------- HEADER META ----------
+(function(){
+  const el = document.getElementById('headerMeta');
+  const stats = [
+    {n: DATA.n_true, l:'Confirmed risks'},
+    {n: DATA.crit_high, l:'Critical & High'},
+    {n: DATA.immediate, l:'Need action now'},
+    {n: DATA.reduction_pct+'%', l:'Avg. risk reduction'}
+  ];
+  el.innerHTML = stats.map(s=>`<div class="stat"><div class="n">${s.n}</div><div class="l">${s.l}</div></div>`).join('');
+})();
+
+// ---------- KPI ROW ----------
+(function(){
+  const el = document.getElementById('kpiRow');
+  const items = [
+    {c:'c1', label:'Total Items Assessed', value:DATA.total_records, sub:`<b>${DATA.n_true}</b> confirmed as true risks`},
+    {c:'c2', label:'Critical & High Exposure', value:DATA.crit_high, sub:`<b>${DATA.inh_counts.Critical}</b> critical · <b>${DATA.inh_counts.High}</b> high`},
+    {c:'c3', label:'Immediate Action Required', value:DATA.immediate, sub:`of ${DATA.n_true} confirmed risks`},
+    {c:'c4', label:'Avg. Inherent Score', value:DATA.avg_inh, sub:`Residual avg. <b>${DATA.avg_res}</b> after controls`},
+    {c:'c5', label:'Risk Reduction Achieved', value:DATA.reduction_pct+'%', sub:`via existing controls & treatment plans`}
+  ];
+  el.innerHTML = items.map(i=>`
+    <div class="kpi ${i.c}">
+      <div class="bar"></div>
+      <div class="label">${i.label}</div>
+      <div class="value">${i.value}</div>
+      <div class="sub">${i.sub}</div>
+    </div>`).join('');
+})();
+
+// ---------- HEAT MATRIX ----------
+(function(){
+  const grid = document.getElementById('matrixGrid');
+  const xax = document.getElementById('matrixX');
+  let html = '';
+  for(let li=5; li>=1; li--){
+    for(let im=1; im<=5; im++){
+      const val = DATA.matrix[li-1][im-1];
+      const score = li*im;
+      const color = bucketColor(score);
+      const op = val===0 ? 0.18 : (0.35 + Math.min(val,20)/20*0.65);
+      html += `<div class="mcell" style="background:${color}; opacity:${val===0?0.28:1}; background-color:${hexA(color, val===0?0.28:1)};" title="Likelihood ${li} × Impact ${im}: ${val} risks">${val}</div>`;
+    }
+  }
+  grid.innerHTML = html;
+  xax.innerHTML = [1,2,3,4,5].map(n=>`<span>${n}</span>`).join('');
+  document.querySelector('.matrix-y').innerHTML = '5 &nbsp;&nbsp; 4 &nbsp;&nbsp; 3 &nbsp;&nbsp; 2 &nbsp;&nbsp; 1';
+})();
+function hexA(hex, alpha){
+  const c = hex.replace('#','');
+  const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// ---------- INHERENT VS RESIDUAL COMPARE ----------
+(function(){
+  const el = document.getElementById('compareGrid');
+  const order = ['Critical','High','Medium','Low'];
+  const maxV = Math.max(...order.map(k=>Math.max(DATA.inh_counts[k], DATA.res_counts[k])));
+  const scale = v => Math.max(4, (v/maxV)*130);
+  el.innerHTML = order.map(k=>{
+    const iv = DATA.inh_counts[k], rv = DATA.res_counts[k];
+    return `<div class="compare-col">
+      <div class="cname" style="color:${bucketColor(k==='Critical'?20:k==='High'?12:k==='Medium'?7:2)}">${k}</div>
+      <div class="compare-bars">
+        <div class="cbar" style="height:${scale(iv)}px; background:${COLORS.brand};"><span>${iv}</span></div>
+        <div class="cbar" style="height:${scale(rv)}px; background:${COLORS.gold};"><span>${rv}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+})();
+
+// ---------- DEPARTMENT BARS (toggle) ----------
+function renderDeptBars(mode){
+  const el = document.getElementById('deptBars');
+  const list = [...DATA.dept_list].sort((a,b)=> mode==='ch' ? b.ch-a.ch : b.avg-a.avg).slice(0,8);
+  const maxV = mode==='ch' ? Math.max(...list.map(d=>d.ch)) : Math.max(...list.map(d=>d.avg));
+  el.innerHTML = list.map(d=>{
+    const v = mode==='ch' ? d.ch : d.avg;
+    const pct = Math.max(3,(v/maxV)*100);
+    const color = mode==='ch' ? (d.ch>=8?COLORS.crit:d.ch>=4?COLORS.high:COLORS.med) : bucketColor(d.avg);
+    return `<div class="barrow">
+      <div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div>
+      <div class="track"><div class="fill" style="width:${pct}%; background:${color};"></div></div>
+      <div class="val">${v}</div>
+    </div>`;
+  }).join('');
+}
+renderDeptBars('ch');
+document.getElementById('deptToggle').addEventListener('click', e=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  document.querySelectorAll('#deptToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderDeptBars(btn.dataset.mode);
+});
+
+// ---------- URGENCY BARS ----------
+(function(){
+  const el = document.getElementById('urgBars');
+  const list = DATA.urg_list;
+  const maxV = Math.max(...list.map(d=>d.value));
+  const cmap = {
+    'Immediate Action Required': COLORS.crit,
+    'Action Required - Near Term': COLORS.high,
+    'Monitor & Schedule Action': COLORS.med,
+    'Monitor - Periodic Review': COLORS.med,
+    'Monitor - Low Priority': COLORS.low,
+    'Closed - Periodic Review Only': '#8A9A92'
+  };
+  el.innerHTML = list.map(d=>{
+    const pct = Math.max(3,(d.value/maxV)*100);
+    return `<div class="barrow">
+      <div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div>
+      <div class="track"><div class="fill" style="width:${pct}%; background:${cmap[d.name]||COLORS.brand};"></div></div>
+      <div class="val">${d.value}</div>
+    </div>`;
+  }).join('');
+})();
+
+// ---------- TREATMENT DONUT ----------
+(function(){
+  const svg = document.getElementById('donutSvg');
+  const legend = document.getElementById('donutLegend');
+  const list = DATA.treat_list;
+  const total = list.reduce((a,b)=>a+b.value,0);
+  const palette = [COLORS.brand, COLORS.gold, COLORS.high, '#8A9A92', COLORS.crit];
+  let angle = -90;
+  const cx=64, cy=64, r=50, rInner=30;
+  let paths = '';
+  list.forEach((d,i)=>{
+    const frac = d.value/total;
+    const sweep = frac*360;
+    const large = sweep>180?1:0;
+    const a0 = angle*Math.PI/180, a1 = (angle+sweep)*Math.PI/180;
+    const x0 = cx+r*Math.cos(a0), y0 = cy+r*Math.sin(a0);
+    const x1 = cx+r*Math.cos(a1), y1 = cy+r*Math.sin(a1);
+    const xi0 = cx+rInner*Math.cos(a1), yi0 = cy+rInner*Math.sin(a1);
+    const xi1 = cx+rInner*Math.cos(a0), yi1 = cy+rInner*Math.sin(a0);
+    paths += `<path d="M ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} L ${xi0} ${yi0} A ${rInner} ${rInner} 0 ${large} 0 ${xi1} ${yi1} Z" fill="${palette[i%palette.length]}"><title>${esc(d.name)}: ${d.value}</title></path>`;
+    angle += sweep;
+  });
+  svg.innerHTML = paths + `<text x="64" y="60" text-anchor="middle" font-size="20" font-weight="700" fill="var(--ink)">${total}</text><text x="64" y="76" text-anchor="middle" font-size="9.5" fill="var(--ink-soft)">risks</text>`;
+  legend.innerHTML = list.map((d,i)=>`
+    <div class="dlg-row">
+      <div class="dlg-left"><span class="dlg-dot" style="background:${palette[i%palette.length]}"></span><span class="dlg-name">${esc(d.name)}</span></div>
+      <div class="dlg-val">${d.value}</div>
+    </div>`).join('');
+})();
+
+// ---------- CATEGORY BARS ----------
+(function(){
+  const el = document.getElementById('catBars');
+  const list = DATA.cat_list;
+  const maxV = Math.max(...list.map(d=>d.value));
+  el.innerHTML = list.map(d=>{
+    const pct = Math.max(3,(d.value/maxV)*100);
+    return `<div class="barrow">
+      <div class="lbl" title="${esc(d.name)}">${esc(d.name)}</div>
+      <div class="track"><div class="fill" style="width:${pct}%; background:${COLORS.brandMid};"></div></div>
+      <div class="val">${d.value}</div>
+    </div>`;
+  }).join('');
+})();
+
+// ---------- TREND CHART ----------
+(function(){
+  const svg = document.getElementById('trendSvg');
+  const list = DATA.yr_list;
+  const W=700,H=190, padL=36, padR=20, padT=18, padB=30;
+  const maxV = Math.max(...list.map(d=>Math.max(d.inh,d.res))) * 1.15;
+  const stepX = (W-padL-padR)/(list.length-1);
+  const xAt = i => padL + i*stepX;
+  const yAt = v => H-padB - (v/maxV)*(H-padT-padB);
+
+  let grid = '';
+  for(let g=0; g<=4; g++){
+    const gy = padT + g*((H-padT-padB)/4);
+    grid += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--line)" stroke-width="1"/>`;
+  }
+
+  function linePath(key){
+    return list.map((d,i)=> (i===0?'M':'L') + xAt(i) + ' ' + yAt(d[key])).join(' ');
+  }
+  function dots(key,color){
+    return list.map((d,i)=>`<circle cx="${xAt(i)}" cy="${yAt(d[key])}" r="4" fill="${color}"/><text x="${xAt(i)}" y="${yAt(d[key])-10}" text-anchor="middle" font-size="11" font-weight="700" fill="${color}">${d[key]}</text>`).join('');
+  }
+  const xlabels = list.map((d,i)=>`<text x="${xAt(i)}" y="${H-8}" text-anchor="middle" font-size="11" fill="var(--ink-soft)">${d.year}</text>`).join('');
+
+  svg.innerHTML = `
+    ${grid}
+    <path d="${linePath('inh')}" fill="none" stroke="${COLORS.brand}" stroke-width="2.5"/>
+    <path d="${linePath('res')}" fill="none" stroke="${COLORS.gold}" stroke-width="2.5" stroke-dasharray="0"/>
+    ${dots('inh', COLORS.brand)}
+    ${dots('res', COLORS.gold)}
+    ${xlabels}
+  `;
+})();
+
+// ---------- TABLE ----------
+(function(){
+  const el = document.getElementById('riskTableBody');
+  const urgColor = u => {
+    if(u==='Immediate Action Required') return {bg:'var(--crit-bg)', fg:'var(--crit)'};
+    if(u==='Action Required - Near Term') return {bg:'var(--high-bg)', fg:'var(--high)'};
+    if(u && u.startsWith('Monitor')) return {bg:'var(--med-bg)', fg:'var(--med)'};
+    return {bg:'var(--low-bg)', fg:'var(--low)'};
+  };
+  el.innerHTML = DATA.top_list.map(r=>{
+    const uc = urgColor(r.urgency);
+    return `<tr>
+      <td class="rid">${esc(r.id)}</td>
+      <td class="dept-cell">${esc(r.dept)}</td>
+      <td class="desc-cell">${esc(r.desc)}</td>
+      <td>
+        <span class="score-pill" style="background:${bucketBg(r.inh)}; color:${bucketColor(r.inh)};">${r.inh}</span>
+        <span class="arrow">→</span>
+        <span class="score-pill" style="background:${r.res!==null?bucketBg(r.res):'var(--line)'}; color:${r.res!==null?bucketColor(r.res):'var(--ink-soft)'};">${r.res!==null?r.res:'—'}</span>
+      </td>
+      <td class="dept-cell">${esc(r.owner)}</td>
+      <td><span class="tag" style="background:${uc.bg}; color:${uc.fg};">${esc(r.urgency)}</span></td>
+    </tr>`;
+  }).join('');
+})();
+
+document.getElementById('genDate').textContent = 'Generated ' + new Date().toLocaleDateString('en-GB', {day:'numeric', month:'long', year:'numeric'});
+</script>
+</body>
+</html>
